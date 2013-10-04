@@ -1,5 +1,5 @@
 #3D Game Programming with Three.js
-==================
+
 This is the Project Files and Source Code repository for my blog:
 <http://3dGameProgramming.blogspot.com>
 
