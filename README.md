@@ -1,7 +1,7 @@
 Readme
 ==================
 This is the Project File and Source Code repository for my blog:
-3dgameprogramming.blogspot.com
+<http://3dGameProgramming.blogspot.com>
 
 You will be able to view and download all the files that were created or discussed on my blog.  And because I have stored all the game project files and source code here at GitHub, they will serve the files to you.  That means you can try out the example code snippets and games for yourself, without having to save any files on your computer.  Just go here and click the links to try the code examples.  
 
