@@ -6,6 +6,11 @@ var VirtualJoystick	= function(opts)
 	this._stickEl		= opts.stickElement	|| this._buildJoystickStick();
 	this._baseEl		= opts.baseElement	|| this._buildJoystickBase();
 	this._mouseSupport	= opts.mouseSupport !== undefined ? opts.mouseSupport : false;
+	this._stationaryBase = opts.stationaryBase || false;
+	this._baseX = this._stickX = opts.baseX || 0;
+	this._baseY = this._stickY = opts.baseY || 0;
+	this._limitStickTravel = opts.limitStickTravel || false;
+	this._stickRadius = opts.stickRadius || 100;
 
 	this._container.style.position	= "relative";
 
@@ -19,11 +24,16 @@ var VirtualJoystick	= function(opts)
 	
 	this._pressed	= false;
 	this._touchIdx	= null;
-	this._baseX	= 0;
-	this._baseY	= 0;
-	this._stickX	= 0;
-	this._stickY	= 0;
-
+	
+	if(this._stationaryBase == true){
+		this._baseEl.style.display	= "";
+		this._baseEl.style.left		= (this._baseX - this._baseEl.width /2)+"px";
+		this._baseEl.style.top		= (this._baseY - this._baseEl.height/2)+"px";
+	}
+    
+    this._transform = (opts.useCssTransform !== undefined ? opts.useCssTransform : true) ? this._getTransformProperty() : false;
+    this._has3d = this._check3D();
+	
 	var __bind	= function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 	this._$onTouchStart	= __bind(this._onTouchStart	, this);
 	this._$onTouchEnd	= __bind(this._onTouchEnd	, this);
@@ -139,28 +149,43 @@ VirtualJoystick.prototype._onUp	= function()
 {
 	this._pressed	= false; 
 	this._stickEl.style.display	= "none";
-	this._baseEl.style.display	= "none";
 	
-	this._baseX	= this._baseY	= 0;
-	this._stickX	= this._stickY	= 0;
+	if(this._stationaryBase == false){	
+		this._baseEl.style.display	= "none";
+	
+		this._baseX	= this._baseY	= 0;
+		this._stickX	= this._stickY	= 0;
+	}
 }
 
 VirtualJoystick.prototype._onDown	= function(x, y)
 {
 	this._pressed	= true; 
-	this._baseX	= x;
-	this._baseY	= y;
+	if(this._stationaryBase == false){
+		this._baseX	= x;
+		this._baseY	= y;
+		this._baseEl.style.display	= "";
+		this._move(this._baseEl.style, (this._baseX - this._baseEl.width /2), (this._baseY - this._baseEl.height/2));
+	}
+	
 	this._stickX	= x;
 	this._stickY	= y;
-
-
+	
+	if(this._limitStickTravel === true){
+		var deltaX	= this.deltaX();
+		var deltaY	= this.deltaY();
+		var stickDistance = Math.sqrt( (deltaX * deltaX) + (deltaY * deltaY) );
+		if(stickDistance > this._stickRadius){
+			var stickNormalizedX = deltaX / stickDistance;
+			var stickNormalizedY = deltaY / stickDistance;
+			
+			this._stickX = stickNormalizedX * this._stickRadius + this._baseX;
+			this._stickY = stickNormalizedY * this._stickRadius + this._baseY;
+		} 	
+	}
+	
 	this._stickEl.style.display	= "";
-	this._stickEl.style.left	= (x - this._stickEl.width /2)+"px";
-	this._stickEl.style.top		= (y - this._stickEl.height/2)+"px";
-
-	this._baseEl.style.display	= "";
-	this._baseEl.style.left		= (x - this._baseEl.width /2)+"px";
-	this._baseEl.style.top		= (y - this._baseEl.height/2)+"px";
+    this._move(this._stickEl.style, (this._stickX - this._stickEl.width /2), (this._stickY - this._stickEl.height/2));	
 }
 
 VirtualJoystick.prototype._onMove	= function(x, y)
@@ -168,9 +193,22 @@ VirtualJoystick.prototype._onMove	= function(x, y)
 	if( this._pressed === true ){
 		this._stickX	= x;
 		this._stickY	= y;
-		this._stickEl.style.left	= (x - this._stickEl.width /2)+"px";
-		this._stickEl.style.top		= (y - this._stickEl.height/2)+"px";
-	}
+		
+		if(this._limitStickTravel === true){
+			var deltaX	= this.deltaX();
+			var deltaY	= this.deltaY();
+			var stickDistance = Math.sqrt( (deltaX * deltaX) + (deltaY * deltaY) );
+			if(stickDistance > this._stickRadius){
+				var stickNormalizedX = deltaX / stickDistance;
+				var stickNormalizedY = deltaY / stickDistance;
+			
+				this._stickX = stickNormalizedX * this._stickRadius + this._baseX;
+				this._stickY = stickNormalizedY * this._stickRadius + this._baseY;
+			} 		
+		}
+		
+        this._move(this._stickEl.style, (this._stickX - this._stickEl.width /2), (this._stickY - this._stickEl.height/2));	
+	}	
 }
 
 
@@ -307,4 +345,69 @@ VirtualJoystick.prototype._buildJoystickStick	= function()
 	ctx.arc( canvas.width/2, canvas.width/2, 40, 0, Math.PI*2, true); 
 	ctx.stroke();
 	return canvas;
+}
+
+//////////////////////////////////////////////////////////////////////////////////
+//		move using translate3d method with fallback to translate > 'top' and 'left'		
+//      modified from https://github.com/component/translate and dependents
+//////////////////////////////////////////////////////////////////////////////////
+
+VirtualJoystick.prototype._move = function(style, x, y)
+{
+  if (this._transform) {
+    if (this._has3d) {
+      style[this._transform] = 'translate3d(' + x + 'px,' + y + 'px, 0)';
+    } else {
+      style[this._transform] = 'translate(' + x + 'px,' + y + 'px)';
+    }
+  } else {
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+  }
+}
+
+VirtualJoystick.prototype._getTransformProperty = function() 
+{
+    var styles = [
+      'webkitTransform',
+      'MozTransform',
+      'msTransform',
+      'OTransform',
+      'transform'
+    ];
+    
+    var el = document.createElement('p');
+    var style;
+    
+    for (var i = 0; i < styles.length; i++) {
+      style = styles[i];
+      if (null != el.style[style]) {
+        return style;
+        break;
+      }
+    }         
+}
+  
+VirtualJoystick.prototype._check3D = function() 
+{        
+    var prop = this._getTransformProperty();
+    // IE8<= doesn't have `getComputedStyle`
+    if (!prop || !window.getComputedStyle) return module.exports = false;
+    
+    var map = {
+      webkitTransform: '-webkit-transform',
+      OTransform: '-o-transform',
+      msTransform: '-ms-transform',
+      MozTransform: '-moz-transform',
+      transform: 'transform'
+    };
+    
+    // from: https://gist.github.com/lorenzopolidori/3794226
+    var el = document.createElement('div');
+    el.style[prop] = 'translate3d(1px,1px,1px)';
+    document.body.insertBefore(el, null);
+    var val = getComputedStyle(el).getPropertyValue(map[prop]);
+    document.body.removeChild(el);
+    var exports = null != val && val.length && 'none' != val;
+    return exports;
 }
